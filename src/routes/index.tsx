@@ -751,6 +751,24 @@ function Index() {
               download="manga-video.mp4"
               className="mt-3 inline-block border-4 border-foreground bg-primary px-5 py-2 font-display font-black uppercase text-primary-foreground"
             >
+            Download mp4
+            </a>
+          </section>
+        )}
+
+        {downloadUrl && (
+          <section className="mt-8 border-4 border-foreground bg-card p-5">
+            <h2 className="font-display text-2xl font-black uppercase">Your video (Colab GPU)</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Encoded on your Colab T4 GPU. Download it while the notebook is still running — the
+              link expires when the Colab session ends.
+            </p>
+            <video src={downloadUrl} controls className="mt-3 w-full border-2 border-foreground" />
+            <a
+              href={downloadUrl}
+              download="manga-video.mp4"
+              className="mt-3 inline-block border-4 border-foreground bg-primary px-5 py-2 font-display font-black uppercase text-primary-foreground"
+            >
               Download mp4
             </a>
           </section>
