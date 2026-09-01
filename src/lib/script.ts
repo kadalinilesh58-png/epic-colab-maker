@@ -61,3 +61,39 @@ export function fmt(t: number): string {
   const s = Math.floor(t % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
 }
+
+export type PanelSource = {
+  start: number;
+  end: number;
+  url?: string | undefined;
+  prompt?: string | undefined;
+};
+
+export type Panel = { url: string; start: number; end: number; prompt?: string | undefined };
+
+/**
+ * Builds the video timeline from the generated shots.
+ *
+ * Panels whose image failed to render must NOT shorten the video — otherwise a
+ * 1:55:04 script exports as a 1:42 video. Instead, the previous successful
+ * panel is held on screen across the gap, so the finished video always spans
+ * the full script duration.
+ */
+export function buildPanelTimeline(shots: PanelSource[]): Panel[] {
+  const all = [...shots].sort((a, b) => a.start - b.start);
+  if (all.length === 0) return [];
+  const timelineEnd = all.reduce((m, s) => Math.max(m, s.end), all[0]!.end);
+  const kept = all.filter((s) => s.url);
+  if (kept.length === 0) return [];
+
+  return kept.map((s, i) => {
+    const start = i === 0 ? Math.min(s.start, all[0]!.start) : s.start;
+    const end = i === kept.length - 1 ? Math.max(s.end, timelineEnd) : kept[i + 1]!.start;
+    return {
+      url: s.url as string,
+      start,
+      end: Math.max(start + 0.8, end),
+      prompt: s.prompt,
+    };
+  });
+}
