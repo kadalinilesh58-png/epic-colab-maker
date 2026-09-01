@@ -660,7 +660,8 @@ function Index() {
                 </pre>
               </details>
             )}
-        </section>
+          </section>
+        )}
 
         <section className="mt-8 border-4 border-foreground bg-card p-5">
           <h2 className="font-display text-2xl font-black uppercase">Colab GPU encoder</h2>
