@@ -412,8 +412,9 @@ function Index() {
       setColabInfo(
         h.gpu
           ? `Connected · T4 GPU (NVENC) encoder ready · ${h.lanes} lanes`
-          : "Connected, but this Colab runtime has no GPU — switch the runtime type to T4 for fast encoding.",
+          : `Connected · CPU encoder (libx264) ready · ${h.lanes} lanes — works fine, just slower than a T4 GPU runtime.`,
       );
+
     } catch (e) {
       setError(
         `Could not reach that Colab encoder. Make sure the notebook is still running. (${
