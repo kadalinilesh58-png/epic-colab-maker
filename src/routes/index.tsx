@@ -690,13 +690,29 @@ function Index() {
           </p>
           <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm">
             <li>
-              <a
-                href="/colab/scene-weaver-gpu-encoder.ipynb"
-                download
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await fetch("/colab/scene-weaver-gpu-encoder.ipynb");
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "scene-weaver-gpu-encoder.ipynb";
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    setTimeout(() => URL.revokeObjectURL(url), 2000);
+                  } catch {
+                    window.open("/colab/scene-weaver-gpu-encoder.ipynb", "_blank");
+                  }
+                }}
                 className="font-semibold underline"
               >
                 Download the notebook
-              </a>{" "}
+              </button>{" "}
+
               and open it in{" "}
               <a
                 href="https://colab.research.google.com/"
