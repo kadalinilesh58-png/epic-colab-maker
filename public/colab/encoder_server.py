@@ -55,7 +55,7 @@ if LANES <= 0:
 GPU_CODEC = ["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "23", "-b:v", "8M"]
 CPU_CODEC = ["-c:v", "libx264", "-preset", os.environ.get("SW_X264_PRESET", "veryfast"),
              "-crf", os.environ.get("SW_CRF", "23"), "-threads",
-             str(max(1, CPU_COUNT // max(1, LANES))), "-tune", "stillimage"]
+             str(max(1, CPU_COUNT // max(1, LANES)))]
 VCODEC = GPU_CODEC if NVENC else CPU_CODEC
 
 # supersample factor before zoompan: 2x on GPU boxes, 1.25x on CPU-only runtimes
