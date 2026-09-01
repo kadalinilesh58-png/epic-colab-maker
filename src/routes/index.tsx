@@ -142,6 +142,16 @@ function Index() {
 
   shotsRef.current = shots;
 
+  // restore the Colab encoder link across refreshes
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("sceneweaver.colabUrl");
+      if (saved) setColabUrlState(saved);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const doneCount = shots.filter((s) => s.status === "done").length;
   const failed = useMemo(() => shots.filter((s) => s.status === "error"), [shots]);
   const pct = shots.length ? Math.round((doneCount / shots.length) * 100) : 0;
