@@ -24,7 +24,7 @@ import urllib.request
 W, H, FPS, XF, GROUP = 1920, 1080, 30, 0.7, 40
 WORK = "/content/sw_work"
 OUT = "/content/sw_out"
-LANES = int(os.environ.get("SW_LANES", "4"))
+LANES = int(os.environ.get("SW_LANES", "0"))
 TOKEN = os.environ.get("SW_TOKEN", "")
 
 os.makedirs(WORK, exist_ok=True)
@@ -44,9 +44,25 @@ def has_nvenc():
         return False
 
 NVENC = has_nvenc()
-VCODEC = (["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "23", "-b:v", "8M"]
-          if NVENC else
-          ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21"])
+
+# CPU fallback must stay watchable *and* fast: Colab's shared vCPUs are slow, so
+# we use a cheaper x264 preset, cap threads sensibly and render from a smaller
+# supersample (see SS below).
+CPU_COUNT = max(1, (os.cpu_count() or 2))
+if LANES <= 0:
+    LANES = 4 if NVENC else max(2, min(4, CPU_COUNT))
+
+GPU_CODEC = ["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "23", "-b:v", "8M"]
+CPU_CODEC = ["-c:v", "libx264", "-preset", os.environ.get("SW_X264_PRESET", "veryfast"),
+             "-crf", os.environ.get("SW_CRF", "23"), "-threads",
+             str(max(1, CPU_COUNT // max(1, LANES)))]
+VCODEC = GPU_CODEC if NVENC else CPU_CODEC
+
+# supersample factor before zoompan: 2x on GPU boxes, 1.25x on CPU-only runtimes
+SS = 2.0 if NVENC else 1.25
+
+print(f"[scene-weaver] encoder mode = {'GPU (NVENC)' if NVENC else 'CPU (libx264)'}, "
+      f"lanes={LANES}, cpus={CPU_COUNT}")
 
 # --------------------------------------------------------- cinematography ---
 
@@ -111,8 +127,8 @@ def clip_filter(i, dur, prompt):
     fx = f"({x0}+({x1}-{x0})*{e})"
     fy = f"({y0}+({y1}-{y0})*{e})"
     return (
-        f"scale={W*2}:{H*2}:force_original_aspect_ratio=increase,"
-        f"crop={W*2}:{H*2},setsar=1,"
+        f"scale={int(W*SS)}:{int(H*SS)}:force_original_aspect_ratio=increase,"
+        f"crop={int(W*SS)}:{int(H*SS)},setsar=1,"
         f"zoompan=z='{z}':x='(iw-iw/zoom)*{fx}':y='(ih-ih/zoom)*{fy}'"
         f":d={frames}:s={W}x{H}:fps={FPS},"
         f"eq=contrast={contrast}:brightness={bright}:saturation={sat},"
@@ -121,10 +137,36 @@ def clip_filter(i, dur, prompt):
     )
 
 
-def run(cmd):
+def _clean_err(err):
+    """ffmpeg prints its whole ./configure line on failure — drop the noise."""
+    lines = [l for l in (err or "").splitlines()
+             if l.strip() and not l.startswith(("  configuration:", "  lib", "  built with"))
+             and not l.startswith("ffmpeg version")]
+    return "\n".join(lines[-12:])[-1200:] or (err or "")[-500:]
+
+
+def run(cmd, allow_codec_fallback=True):
+    global VCODEC
     r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        raise RuntimeError(r.stderr[-1500:])
+    if r.returncode == 0:
+        return
+    err = _clean_err(r.stderr)
+    # NVENC can be advertised but unusable (no GPU runtime / all sessions busy).
+    if allow_codec_fallback and "h264_nvenc" in cmd:
+        print(f"[scene-weaver] NVENC failed, switching to CPU encoding: {err[:200]}")
+        VCODEC = CPU_CODEC
+        cmd = [("libx264" if c == "h264_nvenc" else c) for c in cmd]
+        for flag in ("-preset", "-rc", "-cq", "-b:v", "-tune", "-crf", "-threads"):
+            while flag in cmd:
+                i = cmd.index(flag)
+                del cmd[i:i + 2]
+        i = cmd.index("-c:v")
+        cmd[i + 2:i + 2] = CPU_CODEC[2:]
+        r2 = subprocess.run(cmd, capture_output=True, text=True)
+        if r2.returncode == 0:
+            return
+        err = _clean_err(r2.stderr)
+    raise RuntimeError(err)
 
 
 def fetch(url, path, attempts=4):
@@ -268,7 +310,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
         if path == "/health":
-            return self._send(200, {"ok": True, "gpu": NVENC, "lanes": LANES})
+            return self._send(200, {"ok": True, "gpu": NVENC, "lanes": LANES,
+                                    "mode": "gpu" if NVENC else "cpu"})
         m = re.match(r"^/status/([\w-]+)$", path)
         if m:
             j = JOBS.get(m.group(1))
