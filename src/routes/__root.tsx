@@ -78,8 +78,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Script to Manga — AI Manga Video Generator" },
-
-      { name: "description", content: "Lovable Generated Project" },
+      {
+        name: "description",
+        content: "Turn long scripts into consistent manga-panel videos, encoded in the browser or on a free Colab GPU.",
+      },
       { name: "author", content: "Lovable" },
       { property: "og:title", content: "Script to Manga — AI Manga Video Generator" },
       {
